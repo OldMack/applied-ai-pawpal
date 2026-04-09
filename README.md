@@ -9,7 +9,7 @@ PawPal+ AI Care Advisor extends the original PawPal+ scheduling tool with an **a
 
 ## Demo Walkthrough
 
-> 📽️ **[Loom video link — add after recording]**
+> 📽️ **[Watch the demo walkthrough](https://www.loom.com/share/f0850e3b664d4e6a98e2896f3cbbf6ae)**
 
 ---
 
