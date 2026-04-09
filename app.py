@@ -93,6 +93,15 @@ with st.expander("📋 Current Pets & Tasks", expanded=True):
 # Add task section
 st.header("➕ Add Task")
 
+# Pet selector — let user choose which pet gets the task
+_owner_for_task = st.session_state.system.get_owner_by_email(owner_email)
+_pet_names = [p.name for p in _owner_for_task.pets] if _owner_for_task else []
+selected_pet_name = st.selectbox(
+    "Add task to pet",
+    _pet_names if _pet_names else ["(add a pet first)"],
+    disabled=not _pet_names,
+)
+
 col1, col2, col3 = st.columns(3)
 with col1:
     task_title = st.text_input("Task Title", value="Morning Walk")
@@ -119,12 +128,12 @@ if st.button("Add Task"):
     if not owner:
         owner = Owner(owner_name, owner_email)
         st.session_state.system.add_owner(owner)
-    
+
     if not owner.pets:
         st.error("Please add a pet first!")
     else:
-        # Add to first pet (simplified)
-        pet = owner.pets[0]
+        # Find the selected pet by name, fall back to first pet
+        pet = next((p for p in owner.pets if p.name == selected_pet_name), owner.pets[0])
         
         # Convert priority string to enum
         priority_enum = Priority[priority]
@@ -270,7 +279,7 @@ else:
     if st.button("🔍 Run AI Care Advisor", type="primary"):
         # Build client
         if advisor_mode == "Heuristic only (offline)":
-            advisor_client = MockClient()
+            advisor_client = None  # None = pure heuristic, no LLM calls at all
             client_label = "Heuristic (offline)"
         else:
             api_key = os.getenv("GEMINI_API_KEY", "").strip()
