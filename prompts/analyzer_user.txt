@@ -1,0 +1,15 @@
+Analyze the following pet care schedule and identify any care gaps or issues.
+
+Return a JSON array of issue objects. Each object must have exactly these keys:
+- "type": short category label (e.g. "Care Gap", "Exercise Gap", "Feeding Gap", "Medication Schedule", "Enrichment Gap")
+- "severity": exactly one of "low", "medium", or "high"
+- "pet_name": the name of the affected pet
+- "msg": a clear, specific, 1-2 sentence description of the issue
+
+Rules:
+- Only report real issues — do not fabricate problems that are not supported by the schedule.
+- If no issues are found, return an empty array: []
+- Do not include issues with empty msg or unrecognized severity.
+
+SCHEDULE:
+{schedule_summary}

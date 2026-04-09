@@ -1,0 +1,18 @@
+Based on the care issues found, generate specific improvement suggestions for each affected pet.
+
+Return a JSON array of suggestion objects. Each object must have exactly these keys:
+- "pet_name": the name of the pet this suggestion addresses
+- "priority": exactly one of "low", "medium", or "high"
+- "suggestion": a clear, actionable recommendation in 1-2 sentences
+
+Rules:
+- Generate at most one suggestion per issue — do not over-generate.
+- Do not invent issues or suggestions beyond what the problems listed require.
+- Prioritize HIGH suggestions for missing feeding, exercise, or medication issues.
+- If no suggestions can be made, return an empty array: []
+
+ISSUES (JSON):
+{issues_json}
+
+SCHEDULE:
+{schedule_summary}

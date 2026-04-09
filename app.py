@@ -1,20 +1,34 @@
 """
 PawPal+ Streamlit UI
-Connects the Streamlit UI to the PawPal+ backend system
+Connects the Streamlit UI to the PawPal+ backend system.
+
+Module 5 Extension: AI Care Advisor
+  - Agentic workflow: PLAN → ANALYZE → SUGGEST → EVALUATE → REFLECT
+  - Gemini-powered or heuristic fallback
+  - Confidence scoring guardrail before suggestions are displayed
 """
 
+import os
 import streamlit as st
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
 from pawpal_system import (
     PawPalSystem, Owner, Pet, Task,
     Priority, TaskType, RecurrencePattern
 )
+from pawpal_advisor import PawPalAdvisor
+from llm_client import GeminiClient, MockClient
+
+load_dotenv()
 
 # Initialize session state
 if 'system' not in st.session_state:
     st.session_state.system = PawPalSystem()
 if 'tasks' not in st.session_state:
     st.session_state.tasks = []
+if 'advisor_result' not in st.session_state:
+    st.session_state.advisor_result = None
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -23,6 +37,21 @@ st.markdown("*Smart Pet Care Management System*")
 
 # Sidebar for owner info
 with st.sidebar:
+    st.divider()
+    st.header("🤖 AI Advisor Mode")
+    advisor_mode = st.selectbox(
+        "Advisor mode",
+        ["Heuristic only (offline)", "Gemini (requires API key)"],
+        help="Heuristic mode runs fully offline. Gemini uses the API for deeper analysis.",
+    )
+    if advisor_mode == "Gemini (requires API key)":
+        st.warning("⚠️ Uses one Gemini API request per run.")
+    advisor_model = st.selectbox(
+        "Gemini model",
+        ["gemini-2.5-flash", "gemini-2.5-pro"],
+        disabled=(advisor_mode != "Gemini (requires API key)"),
+    )
+    st.divider()
     st.header("👤 Owner Info")
     owner_name = st.text_input("Owner Name", value="John")
     owner_email = st.text_input("Owner Email", value="john@example.com")
@@ -214,11 +243,110 @@ with st.expander("🔍 How the Scheduling Algorithm Works"):
 with st.expander("📝 Reflection"):
     st.markdown("""
     ### AI Collaboration Reflection
-    
+
     How did you use AI in this project?
-    
+
     1. What prompts did you use to help design the system?
     2. How did AI help (or not help) with the UML design?
     3. What challenges did you face when implementing the scheduling logic?
     4. How would you improve the AI-human collaboration for future projects?
     """)
+
+# ============================================================
+# AI CARE ADVISOR (Module 5 Extension)
+# ============================================================
+st.divider()
+st.header("🤖 AI Care Advisor")
+st.caption(
+    "Runs an agentic workflow that analyzes your pet schedules, detects care gaps, "
+    "proposes improvements, and evaluates confidence before displaying suggestions."
+)
+
+owner_for_advisor = st.session_state.system.get_owner_by_email(owner_email)
+
+if not owner_for_advisor or not owner_for_advisor.pets:
+    st.info("Add a pet and some tasks above, then run the advisor to get care recommendations.")
+else:
+    if st.button("🔍 Run AI Care Advisor", type="primary"):
+        # Build client
+        if advisor_mode == "Heuristic only (offline)":
+            advisor_client = MockClient()
+            client_label = "Heuristic (offline)"
+        else:
+            api_key = os.getenv("GEMINI_API_KEY", "").strip()
+            if not api_key:
+                st.error("Missing GEMINI_API_KEY in your .env file. Switch to Heuristic mode or add your key.")
+                st.stop()
+            advisor_client = GeminiClient(model_name=advisor_model)
+            client_label = f"Gemini ({advisor_model})"
+
+        advisor = PawPalAdvisor(client=advisor_client)
+        with st.spinner("Advisor is analyzing your pet schedules..."):
+            result = advisor.run(owner_for_advisor)
+        st.session_state.advisor_result = result
+        st.session_state.advisor_client_label = client_label
+
+    if st.session_state.advisor_result:
+        result = st.session_state.advisor_result
+        client_label = st.session_state.get("advisor_client_label", "")
+
+        st.caption(f"Mode: **{client_label}**")
+
+        issues = result.get("issues", [])
+        suggestions = result.get("suggestions", [])
+        confidence = result.get("confidence", {})
+        logs = result.get("logs", [])
+
+        adv_col1, adv_col2 = st.columns([1, 1])
+
+        with adv_col1:
+            st.subheader("🔎 Detected Care Issues")
+            if not issues:
+                st.success("No care gaps detected — your pets' schedules look complete!")
+            else:
+                for i, issue in enumerate(issues, 1):
+                    sev = issue.get("severity", "").upper()
+                    color = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(sev, "⚪")
+                    st.markdown(
+                        f"**{i}. {color} [{sev}] {issue.get('type', 'Issue')} — {issue.get('pet_name', '')}**"
+                    )
+                    st.write(issue.get("msg", ""))
+
+        with adv_col2:
+            st.subheader("💡 Suggestions")
+            conf_score = confidence.get("score", "-")
+            conf_level = confidence.get("level", "unknown").upper()
+            should_display = confidence.get("should_display", False)
+
+            conf_cols = st.columns(3)
+            with conf_cols[0]:
+                st.metric("Confidence", conf_level)
+            with conf_cols[1]:
+                st.metric("Score", conf_score)
+            with conf_cols[2]:
+                st.metric("Auto-show?", "YES" if should_display else "NO")
+
+            if confidence.get("reasons"):
+                with st.expander("Confidence reasons"):
+                    for r in confidence["reasons"]:
+                        st.write(f"- {r}")
+
+            if not should_display:
+                st.warning(
+                    "⚠️ Low confidence — review these suggestions carefully before acting on them."
+                )
+
+            if not suggestions:
+                st.info("No suggestions generated.")
+            else:
+                for i, s in enumerate(suggestions, 1):
+                    pri = s.get("priority", "").upper()
+                    color = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(pri, "⚪")
+                    st.markdown(
+                        f"**{i}. {color} [{pri}] {s.get('pet_name', '')}**"
+                    )
+                    st.write(s.get("suggestion", ""))
+
+        st.subheader("📋 Agent Trace")
+        for entry in logs:
+            st.write(f"**{entry['step']}:** {entry['message']}")
