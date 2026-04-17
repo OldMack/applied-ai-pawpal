@@ -1,4 +1,5 @@
 # PawPal+ AI Care Advisor
+https://www.loom.com/share/f0850e3b664d4e6a98e2896f3cbbf6ae
 
 > **Applied AI System — Module 5 Final Project (AI110)**
 > Base project: *PawPal+* (Module 2 Show — Smart Pet Care Management System)
